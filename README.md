@@ -5,7 +5,7 @@ The current implementation uses Apache Airflow to orchestrate a daily report wor
 
 This is not a simple script exercise. You should understand the pipeline structure, the separation between orchestration and business logic, and the way Airflow passes execution metadata into tasks.
 
-## 🎯 What You Will Learn
+## 🎯Core Concepts to Apply
 
 - **Airflow TaskFlow API:** Define DAGs and tasks with decorators.
 - **DAG design:** Keep business logic out of the DAG file and use adapter/task wrapper functions.
@@ -20,8 +20,7 @@ This is not a simple script exercise. You should understand the pipeline structu
 
 The pipeline is organized as follows:
 
-- `dags/ecommerce_dag.py` — Airflow DAG definition and task orchestration.
-- `pipeline/airflow_tasks.py` — lightweight wrappers that execute the core ETL work.
+- `dags/ecommerce_dag.py` — Airflow DAG definition and task orchestration.- `pipeline/di.py` — dependency injection factory functions for Airflow wiring.- `pipeline/etl_adapters.py` — lightweight wrappers that execute the core ETL work.
 - `pipeline/config.py` — Pydantic settings for `data_dir`, `tmp_dir`, and `reports_dir`.
 - `data_generator.py` — creates nested zip event archives for local testing.
 - `sql/init.sql` — initializes the PostgreSQL database with customers and products.
@@ -158,7 +157,7 @@ Your work should be focused on the following responsibilities:
 For this task, the trainee should provide:
 
 - A working Airflow DAG in `dags/ecommerce_dag.py`
-- ETL logic in `pipeline/airflow_tasks.py` and related pipeline modules
+- ETL logic in `pipeline/etl_adapters.py` and related pipeline modules
 - A generated report in `reports/sales_report.csv`
 - Clean, type-hinted Python code with docstrings
 - A working `cleanup_task` that preserves disk space

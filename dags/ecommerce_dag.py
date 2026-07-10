@@ -11,7 +11,13 @@ from typing import Dict
 from airflow.decorators import dag, task
 from airflow.utils.context import Context
 
-from pipeline.airflow_tasks import extract_db, extract_files, load, transform
+from pipeline.di import (
+    create_db_extractor,
+    create_file_extractor,
+    create_loader,
+    create_transformer,
+)
+from pipeline.etl_adapters import extract_db, extract_files, load, transform
 
 default_args = {
     "owner": "data_engineer",
@@ -55,7 +61,10 @@ def ecommerce_daily_report():
         :rtype: str
         """
         current_run_date = context["ds"]
-        return extract_files(run_date=current_run_date)
+        return extract_files(
+            run_date=current_run_date,
+            file_extractor=create_file_extractor(),
+        )
 
     @task(task_id="extract_db_task", multiple_outputs=True)
     def extract_db_task(**context: Context) -> Dict[str, str]:
@@ -71,7 +80,10 @@ def ecommerce_daily_report():
         :rtype: dict
         """
         current_run_date = context["ds"]
-        return extract_db(run_date=current_run_date)
+        return extract_db(
+            run_date=current_run_date,
+            db_extractor=create_db_extractor(),
+        )
 
     @task(task_id="transform_task")
     def transform_task(
@@ -103,6 +115,7 @@ def ecommerce_daily_report():
             events_path=events_path,
             customers_path=customers_path,
             products_path=products_path,
+            transformer=create_transformer(),
         )
 
     @task(task_id="load_task")
@@ -119,7 +132,7 @@ def ecommerce_daily_report():
         :return: None
         :rtype: None
         """
-        load(report_path)
+        load(report_path, loader=create_loader())
 
     @task(task_id="cleanup_task", trigger_rule="all_done")
     def cleanup_task(**context: Context) -> None:

@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Dict
 
 from pipeline.config import settings
+from pipeline.extractors.interfaces import IEnrichmentExtractor, IEventsExtractor
+from pipeline.loaders.interfaces import ILoader
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TMP_DIR_BASE = PROJECT_ROOT / settings.tmp_dir
@@ -44,48 +46,57 @@ def _run_dir_for(run_key: str) -> Path:
     return run_dir
 
 
-def extract_files(run_date: str) -> str:
+def extract_files(run_date: str, file_extractor: IEventsExtractor | None = None) -> str:
     """Extract events from nested archives and persist them to a CSV file.
 
     :param run_date: The logical Airflow execution date (``ds``) in
         ``YYYY-MM-DD`` format used to isolate artifacts.
     :type run_date: str
+    :param file_extractor: Optional file extractor instance for dependency injection.
+    :type file_extractor: pipeline.extractors.interfaces.IEventsExtractor | None
     :return: Path to the persisted events CSV file.
     :rtype: str
     """
-    # Local imports keep DAG parsing lightweight.
-    from pipeline.extractors import FileExtractor
+    if file_extractor is None:
+        # Local imports keep DAG parsing lightweight.
+        from pipeline.extractors import FileExtractor
+
+        file_extractor = FileExtractor()
 
     run_dir = _run_dir_for(run_date)
     events_path = run_dir / "events.csv"
 
-    extractor = FileExtractor()
-    events_df = extractor.extract()
+    events_df = file_extractor.extract()
     events_df.to_csv(events_path, index=False)
     return str(events_path)
 
 
-def extract_db(run_date: str) -> Dict[str, str]:
+def extract_db(
+    run_date: str, db_extractor: IEnrichmentExtractor | None = None
+) -> Dict[str, str]:
     """Extract customer and product catalogues from the database.
 
     :param run_date: The logical Airflow execution date (``ds``) in
         ``YYYY-MM-DD`` format used to isolate artifacts.
     :type run_date: str
+    :param db_extractor: Optional database extractor instance for dependency injection.
+    :type db_extractor: pipeline.extractors.interfaces.IEnrichmentExtractor | None
     :return: Dictionary with keys ``customers_path`` and ``products_path``.
     :rtype: dict
     """
-    # Local imports keep DAG parsing lightweight.
-    from pipeline.extractors import DbExtractor
-    from pipeline.utils.db_connection import DBConnectionManager
+    if db_extractor is None:
+        # Local imports keep DAG parsing lightweight.
+        from pipeline.extractors import DbExtractor
+        from pipeline.utils.db_connection import DBConnectionManager
+
+        db_extractor = DbExtractor(db_manager=DBConnectionManager())
 
     run_dir = _run_dir_for(run_date)
     customers_path = run_dir / "customers.csv"
     products_path = run_dir / "products.csv"
 
-    db_manager = DBConnectionManager()
-    extractor = DbExtractor(db_manager=db_manager)
-    customers_df = extractor.extract_customers()
-    products_df = extractor.extract_products()
+    customers_df = db_extractor.extract_customers()
+    products_df = db_extractor.extract_products()
     customers_df.to_csv(customers_path, index=False)
     products_df.to_csv(products_path, index=False)
 
@@ -93,7 +104,11 @@ def extract_db(run_date: str) -> Dict[str, str]:
 
 
 def transform(
-    run_date: str, events_path: str, customers_path: str, products_path: str
+    run_date: str,
+    events_path: str,
+    customers_path: str,
+    products_path: str,
+    transformer: "SalesTransformer" | None = None,
 ) -> str:
     """Load extracted datasets, run transformation, and persist the report.
 
@@ -105,13 +120,20 @@ def transform(
     :type customers_path: str
     :param products_path: Path to the CSV file with products.
     :type products_path: str
+    :param transformer: Optional transformer instance for dependency injection.
+    :type transformer: pipeline.transformers.SalesTransformer | None
     :return: Path to the persisted report CSV file.
     :rtype: str
     """
-    # Local imports keep DAG parsing lightweight.
-    import pandas as pd
+    if transformer is None:
+        # Local imports keep DAG parsing lightweight.
+        import pandas as pd
 
-    from pipeline.transformers import SalesTransformer
+        from pipeline.transformers import SalesTransformer
+
+        transformer = SalesTransformer()
+    else:
+        import pandas as pd
 
     run_dir = _run_dir_for(run_date)
     report_path = run_dir / "sales_report.csv"
@@ -119,17 +141,18 @@ def transform(
     events_df = pd.read_csv(events_path)
     customers_df = pd.read_csv(customers_path)
     products_df = pd.read_csv(products_path)
-    transformer = SalesTransformer()
     report_df = transformer.transform(events_df, customers_df, products_df)
     report_df.to_csv(report_path, index=False)
     return str(report_path)
 
 
-def load(report_path: str) -> None:
+def load(report_path: str, loader: ILoader | None = None) -> None:
     """Load the transformed report and persist final CSV files.
 
     :param report_path: Path to the transformed report CSV file.
     :type report_path: str
+    :param loader: Optional report loader for dependency injection.
+    :type loader: pipeline.loaders.interfaces.ILoader | None
     :return: None
     :rtype: None
     """
@@ -138,6 +161,8 @@ def load(report_path: str) -> None:
 
     from pipeline.loaders import FileLoader
 
+    if loader is None:
+        loader = FileLoader()
+
     report_df = pd.read_csv(report_path)
-    loader = FileLoader()
     loader.load(report_df)
