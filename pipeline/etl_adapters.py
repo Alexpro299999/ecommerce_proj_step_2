@@ -85,7 +85,6 @@ def extract_db(
     :rtype: dict
     """
     if db_extractor is None:
-        # Local imports keep DAG parsing lightweight.
         from pipeline.extractors import DbExtractor
         from pipeline.utils.db_connection import DBConnectionManager
 
@@ -95,8 +94,14 @@ def extract_db(
     customers_path = run_dir / "customers.csv"
     products_path = run_dir / "products.csv"
 
-    customers_df = db_extractor.extract_customers()
-    products_df = db_extractor.extract_products()
+    customers_df = db_extractor.extract_table(
+        table_name="customers",
+        columns=["customer_id", "join_date", "segment"]
+    )
+    products_df = db_extractor.extract_table(
+        table_name="products",
+        columns=["product_id", "product_name", "category", "price"]
+    )
     customers_df.to_csv(customers_path, index=False)
     products_df.to_csv(products_path, index=False)
 
