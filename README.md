@@ -1,204 +1,174 @@
 # 🚀 E-commerce Analytics Pipeline
 
-Welcome to your data engineering project! The goal is to simulate a real-world commercial task by building a complete ETL (Extract, Transform, Load) pipeline.
+This repository is a practical trainee assignment for a modern Airflow-based ETL pipeline.
+The current implementation uses Apache Airflow to orchestrate a daily report workflow that extracts nested event data, enriches it from PostgreSQL, transforms it with Pandas, and writes CSV reports.
 
-You will be responsible for designing, building, and running a Python application that reads data from multiple sources (files and a database), processes it, and generates a final analysis report.
+This is not a simple script exercise. You should understand the pipeline structure, the separation between orchestration and business logic, and the way Airflow passes execution metadata into tasks.
 
-This project will challenge you to apply everything you've learned about **Python**, **OOP**, **SOLID**, **Pandas**, **NumPy**, and **PostgreSQL**.
+## 🎯Core Concepts to Apply
 
-## 🎯 Core Concepts to Apply
-
-- **OOP (Object-Oriented Programming):** You will build a modular application using classes.
-- **SOLID Principles:** Your code should be maintainable and extensible.
-- **Pandas:** For loading, merging, and aggregating the data.
-- **NumPy:** For efficient, vectorized numerical calculations.
-- **PostgreSQL:** For connecting to, and reading from, a relational database.
-- **Pydantic Settings:** For settings handling, using .env file for settings.
-
----
-
-## 📖 The Task: Your Scenario
-
-You are a data engineer at a new e-commerce company. Your data is fragmented:
-
-1.  **Business Data:** Your company's `product` catalog and `customer` information live in a production **PostgreSQL** database.
-2.  **Event Data:** All user activity (clicks, purchases) is dumped as JSON event logs into a complex, nested zip file structure.
-
-**Your mission:** Create an automated pipeline that will be runnned daily. It must read all the event data, enrich it with data from the database, and produce a final CSV report summarizing sales performance by product category and customer segment.
+- **Airflow TaskFlow API:** Define DAGs and tasks with decorators.
+- **DAG design:** Keep business logic out of the DAG file and use adapter/task wrapper functions.
+- **File-based run isolation:** Use the Airflow logical date (`ds`) to keep each run separate.
+- **PostgreSQL extraction:** Load `customers` and `products` tables from the database.
+- **Pandas transformation:** Join, filter, aggregate, and write final reports.
+- **Cleanup:** Remove temporary artifacts after the DAG completes.
 
 ---
 
-## 🗃️ The Data Sources
+## 📦 Current Architecture
 
-You will be working with two distinct data sources.
+The pipeline is organized as follows:
 
-### 1. File System: Event Logs
+- `dags/ecommerce_dag.py` — Airflow DAG definition and task orchestration.- `pipeline/di.py` — dependency injection factory functions for Airflow wiring.- `pipeline/etl_adapters.py` — lightweight wrappers that execute the core ETL work.
+- `pipeline/config.py` — Pydantic settings for `data_dir`, `tmp_dir`, and `reports_dir`.
+- `data_generator.py` — creates nested zip event archives for local testing.
+- `sql/init.sql` — initializes the PostgreSQL database with customers and products.
 
-You must generate this data using the `data_generator.py` script.
+The DAG currently defines five tasks:
 
-- **Structure:** The script creates master zip files (e.g., `data/events_week_42.zip`).
-- **Nesting:**
-  - Inside the master zip are **daily zip files** (e.g., `events_2023-10-23.zip`).
-  - Inside each daily zip are **JSON part-files** (e.g., `part-001.json`).
-- **Event JSON Format:**
-  ```json
-  [
-    {
-      "timestamp": "...",
-      "customer_id": "c123",
-      "event_type": "view_product",
-      "product_id": "p789"
-    },
-    {
-      "timestamp": "...",
-      "customer_id": "c456",
-      "event_type": "purchase",
-      "product_id": "p101",
-      "quantity": 2
-    }
-  ]
-  ```
-
-### 2. PostgreSQL Database
-
-You will run a Docker container that automatically creates and populates this database using the `sql/init.sql` script.
-
-- **`customers` table:** Contains information on all 100 customers.
-  | customer_id | join_date | segment |
-  | :--- | :--- | :--- |
-  | c001 | 2024-12-05 | Regular |
-  | c002 | 2025-07-21 | VIP |
-  | ... | ... | ... |
-  | c100 | 2025-03-14 | New |
-
-- **`products` table:** Contains information on all 50 products.
-  | product_id | product_name | category | price |
-  | :--- | :--- | :--- | :--- |
-  | p001 | Product Gamma 1 | Electronics | 149.99 |
-  | p002 | Product Alpha 2 | Books | 24.50 |
-  | ... | ... | ... | ... |
-  | p050 | Product Delta 50 | Electronics | 299.95 |
+1. `extract_files_task` — extracts event data from nested ZIP archives.
+2. `extract_db_task` — extracts customers and products from PostgreSQL.
+3. `transform_task` — joins, filters, and aggregates sales data.
+4. `load_task` — writes final CSV output to the `reports/` folder.
+5. `cleanup_task` — removes temporary files even if the DAG fails.
 
 ---
 
-## 🛠️ 🐧 Setup: How to Get Started (Linux)
+## 🧠 Data Flow and Requirements
 
-Follow these steps to set up your environment.
+### Data sources
 
-### Step 1: Set up the Python Environment
+1. **File source:** nested ZIP files under `data/`
 
-Let's create a virtual environment and install the dependencies.
+   - top-level ZIP contains daily archives
+   - each daily archive contains JSON part-files
+   - event records include `timestamp`, `customer_id`, `event_type`, `product_id`, `quantity`
+2. **Database source:** PostgreSQL tables
+
+   - `customers` contains customer metadata and segment
+   - `products` contains product metadata, price, and category
+
+### Business goal
+
+Produce a sales report that shows revenue and volume by:
+
+- `category`
+- `customer_segment`
+
+The report should include:
+
+- `total_revenue`
+- `units_sold`
+- `unique_customers`
+
+---
+
+## ⚙️ Environment Setup
+
+This project uses Docker Compose for PostgreSQL and Airflow.
+The service configuration is already defined in `docker-compose.yml`.
+
+### Start the stack
 
 ```bash
-# Synchronize packages via uv
-uv sync
-
-# Activate virtual environment if needed
-source .venv/bin/activate
-```
-
-### Step 2: Start the Database
-
-This project uses Docker to run the PostgreSQL database. The `docker-compose.yml` file is already configured.
-
-```bash
-# This command will start the database in the background.
-# It will automatically find the `sql/init.sql` file and
-# run it to create your tables and data.
-
+# Start the services in the background
 docker compose up -d
 ```
 
-Your database is now running. You can connect to it with these credentials:
+### Airflow UI
 
-- **Host:** `localhost`
-- **Port:** `5432`
-- **User:** `myuser`
-- **Password:** `mypassword`
-- **Database:** `ecommerce_db`
+Open the UI at:
 
-### Step 3: Generate the Event Data
+- `http://localhost:8081`
 
-Now, run the Python script to generate the raw event logs.
+Use the built-in credentials:
 
-```bash
-# This will create 50 weekly archives in a new 'data/' folder
-python data_generator.py -c 50
-```
+- **Username:** `admin`
+- **Password:** `admin`
 
-## 🛠️ 🪟 Setup: How to Get Started (Windows)
+### Local Python environment
 
-Follow these steps to set up your environment on Windows.
-
-Important: Make sure you have Docker Desktop installed and running before you start.
-
-### Step 1: Set up the Python Environment
-
-Open your terminal (Command Prompt) to set up the uv environment.
+Use `uv` if available, otherwise install dependencies using the normal Python workflow.
 
 ```bash
-# Synchronize packages via uv
 uv sync
-
-# Activate virtual environment if needed
-.venv\Scripts\activate.bat
-# Or .venv\Scripts\Activate.ps1 for powershell
+source .venv/bin/activate
 ```
 
-### Step 2: Start the Database
+If you do not use `uv`, install the dependencies from `pyproject.toml`.
 
-This project uses Docker to run the PostgreSQL database. The `docker-compose.yml` file is already configured.
+---
 
-```bash
-# This command will start the database in the background.
-# It will automatically find the `sql/init.sql` file and
-# run it to create your tables and data.
+## 🧪 Running the Project
 
-docker-compose up -d
-```
-
-### Step 3: Generate the Event Data
-
-Now, run the Python script to generate the raw event logs.
+### Generate the event dataset
 
 ```bash
-# This will create 50 weekly archives in a new 'data/' folder
 python data_generator.py -c 50
 ```
 
-_You are now ready to build! Good luck =)_
+This creates the `data/` folder and nested event archives for the pipeline to process.
 
-## 📋 Your Mission: The Pipeline
+### Run unit tests
 
-Your main task is to create the core pipeline logic (e.g., in a `pipeline/` directory). Your pipeline must perform these **Extract**, **Transform** and **Load** steps:
+```bash
+python -m pytest -q
+```
 
-1. **Extract (Files):** Create a class that can navigate the nested zip structure (`data/*.zip` -> `*.zip` -> `*.json`) and load all events into a single Pandas DataFrame. Also add functionality for **batch processing** for weak machines.
-2. **Extract (DB):** Create a class that connects to the PostgreSQL database and loads the `customers` and `products` tables into two separate DataFrames (hint: use `pd.read_sql`).
-3. **Transform:**
+### Inspect Airflow DAGs
 
-- Filter the events DataFrame to get **only** `purchase` events.
-- **Join** the `purchase` events with the `products` DataFrame on `product_id`.
-- **Join** the result with the `customers` DataFrame on `customer_id`.
-- **Feature Engineering:** Create a new column `total_revenue` = `quantity` \* `price`.
-- **Aggregate:** `groupby()` the DataFrame by `category` and `customer_segment`.
-- **Count:** Calculate the `sum` of `total_revenue`, `sum` of `quantity` (as `units_sold`), and the `nunique` (count distinct) of `customer_id`.
+The DAG is loaded from `dags/ecommerce_dag.py`.
+Look for `ecommerce_daily_report` in the Airflow UI.
 
-4. **Load:** Save this final, aggregated DataFrame to a new file (e.g., `reports/sales_report.csv`).
+---
 
-## 🏁 Final Report (The Target)
+## 🛠️ Task Assignment
 
-| category    | customer_segment | total_revenue | units_sold | unique_customers |
-| :---------- | :--------------- | :------------ | :--------- | :--------------- |
-| Electronics | VIP              | 14999.50      | 120        | 45               |
-| Electronics | New              | 8500.00       | 70         | 60               |
-| Clothing    | Regular          | 5200.25       | 210        | 115              |
-| Books       | Lapsed           | 1500.75       | 80         | 30               |
-| ...         | ...              | ...           | ...        | ...              |
+Your work should be focused on the following responsibilities:
 
-## ⭐ Bonus Challenges
+- Keep the DAG file small and declarative.
+- Put extraction, transformation, and loading logic into `pipeline/` modules.
+- Use the Airflow execution date (`ds`) to create per-run temporary directories.
+- Persist intermediate CSV files under `data/tmp/<run_date>/`.
+- Keep the final output in `reports/`.
+- Ensure `cleanup_task` removes temporary artifacts with `trigger_rule='all_done'`.
 
-If you finish the main task, try these:
+### Expected behavior
 
-- **Unit Testing:** Write `pytest` tests for your `DataTransformer` class.
-- **Logging:** Add a proper `logging` module to your pipeline to log info and error messages.
-- **Separate Reports:** Create a separate `report.csv` for each product category.
+- The pipeline should be idempotent: rerunning the same DAG date must not overwrite unrelated runs.
+- Temporary files should be removed after execution.
+- The final report should be easy to inspect in `reports/`.
+
+---
+
+## 📁 Important Paths
+
+- `data/` — source event archives and temporary run data
+- `data/tmp/` — intermediate files for each `ds` run
+- `reports/` — final CSV outputs
+- `dags/` — Airflow DAG definitions
+- `pipeline/` — ETL task adapters and pipeline logic
+
+---
+
+## 🚀 What to Deliver
+
+For this task, the trainee should provide:
+
+- A working Airflow DAG in `dags/ecommerce_dag.py`
+- ETL logic in `pipeline/etl_adapters.py` and related pipeline modules
+- A generated report in `reports/sales_report.csv`
+- Clean, type-hinted Python code with docstrings
+- A working `cleanup_task` that preserves disk space
+
+---
+
+## ⭐ Bonus improvements
+
+If you want to go further, try these enhancements:
+
+- Add more robust logging to the pipeline.
+- Add integration tests for the DAG logic.
+- Create one CSV file per product category in `reports/`.
+- Use `pytest` fixtures to mock `db` and file extraction during tests.

@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     :ivar db_port: Database server port.
     :ivar db_name: Target database name.
     :ivar batch_size: Number of events per processing batch.
+    :ivar log_dir: Directory for storing application logs.
     :ivar data_dir: Directory containing raw event ZIP archives.
+    :ivar tmp_dir: Directory for temporary files between Airflow tasks.
     :ivar reports_dir: Directory for generated CSV reports.
     """
 
@@ -31,12 +33,15 @@ class Settings(BaseSettings):
     db_port: int = 5432
     db_name: str = "ecommerce_db"
     batch_size: int = 50000
-    
+
     log_dir: str = "logs"
     data_dir: str = "data"
+    tmp_dir: str = "data/tmp"
     reports_dir: str = "reports"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
 
 # Singleton-style instance - import this directly across the project.

@@ -1,26 +1,48 @@
+"""Airflow DAG for e-commerce sales reporting pipeline.
+
+This module is a lightweight orchestrator — task implementations
+are defined in `dags.ecommerce_tasks` to keep DAG parsing fast and
+the orchestration clear.
+"""
+
 from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.bash import BashOperator
+
+from airflow.decorators import dag
+
+from dags.ecommerce_tasks import (
+    cleanup_task,
+    extract_db_task,
+    extract_files_task,
+    load_task,
+    transform_task,
+)
 
 default_args = {
-    'owner': 'data_engineer',
-    'depends_on_past': False,
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    "owner": "data_engineer",
+    "depends_on_past": False,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
 }
 
-with DAG(
-    'ecommerce_daily_report',
-    default_args=default_args,
-    description='Daily ETL pipeline',
-    schedule='@daily',
-    start_date = datetime(2026, 5, 28),
-    catchup=False,
-    tags=['ecommerce', 'etl']
-) as dag:
-    run_etl_pipeline = BashOperator(
-        task_id='execute_main_py',
-        bash_command='cd /opt/airflow/project && python main.py'
-    )
 
-    run_etl_pipeline
+@dag(
+    dag_id="ecommerce_daily_report",
+    default_args=default_args,
+    description="Daily ETL pipeline for e-commerce sales reporting",
+    schedule="@daily",
+    start_date=datetime(2026, 5, 28),
+    catchup=False,
+    tags=["ecommerce", "etl"],
+)
+def ecommerce_daily_report():
+    events_path = extract_files_task()
+    db_outputs = extract_db_task()
+    customers_path = db_outputs["customers_path"]
+    products_path = db_outputs["products_path"]
+    report_path = transform_task(events_path, customers_path, products_path)
+    load_op = load_task(report_path)
+    cleanup_op = cleanup_task()
+    load_op >> cleanup_op
+
+
+dag = ecommerce_daily_report()

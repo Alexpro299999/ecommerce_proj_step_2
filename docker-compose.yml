@@ -5,6 +5,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+    PYTHONPATH: /opt/airflow/project
+    # Application-level overrides so Airflow tasks use project-mounted paths
+    DB_HOST: db
+    DATA_DIR: /opt/airflow/project/data
+    REPORTS_DIR: /opt/airflow/project/reports
+    TMP_DIR: /opt/airflow/project/data/tmp
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -60,7 +66,7 @@ services:
     container_name: airflow_webserver
     command: webserver
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       airflow-db:
         condition: service_started

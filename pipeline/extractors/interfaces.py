@@ -33,28 +33,18 @@ class IEventsExtractor(ABC):
 class IEnrichmentExtractor(ABC):
     """
     Interface for extracting enrichment data from a database.
-
-    Provides separate methods for each entity type to allow
-    independent loading and caching strategies.
     """
 
     @abstractmethod
-    def extract_customers(self) -> pd.DataFrame:
+    def extract_table(self, table_name: str, columns: list[str]) -> pd.DataFrame:
         """
-        Loads the full customer catalogue.
+        Load a table from the database with specified columns.
 
-        :return: DataFrame with columns ``customer_id``, ``join_date``, ``segment``.
-        :rtype: pd.DataFrame
-        """
-        pass
-
-    @abstractmethod
-    def extract_products(self) -> pd.DataFrame:
-        """
-        Loads the full product catalogue.
-
-        :return: DataFrame with columns ``product_id``, ``product_name``,
-            ``category``, ``price``.
+        :param table_name: Name of the table to extract.
+        :type table_name: str
+        :param columns: List of column names to select.
+        :type columns: list[str]
+        :return: DataFrame with the selected columns.
         :rtype: pd.DataFrame
         """
         pass
