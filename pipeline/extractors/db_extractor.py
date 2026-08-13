@@ -41,27 +41,3 @@ class DbExtractor(IEnrichmentExtractor):
         with self.db_manager.connect() as conn:
             df = pd.read_sql(query, conn)
         return df
-
-    def extract_customers(self) -> pd.DataFrame:
-        """
-        Load the customers table from the database.
-
-        :return: DataFrame with columns customer_id, join_date, segment.
-        :rtype: pd.DataFrame
-        """
-        return self.extract_table(
-            table_name="customers",
-            columns=["customer_id", "join_date", "segment"]
-        )
-
-    def extract_products(self) -> pd.DataFrame:
-        """
-        Load the products table from the database.
-
-        :return: DataFrame with columns product_id, product_name, category, price.
-        :rtype: pd.DataFrame
-        """
-        return self.extract_table(
-            table_name="products",
-            columns=["product_id", "product_name", "category", "price"]
-        )

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from airflow.decorators import dag
 
-from pipeline.tasks import (
+from dags.ecommerce_tasks import (
     cleanup_task,
     extract_db_task,
     extract_files_task,
